@@ -73,8 +73,27 @@ class BarberiaMonitor:
             #    - avisar al barbero y al siguiente cliente en espera (notify).
             # 7. Retornar True.
             # =====================================================================
-            pass
-            return False
+            self.clientes_esperando += 1
+            self.cond_barbero.notify()
+            while self.silla_barbero_ocupada:
+                self.cond_sala_espera.wait()
+
+            self.clientes_esperando -= 1
+            self.silla_barbero_ocupada = True
+            self.cliente_listo_en_sillon = True
+            print(f"Cliente {cliente_id} se sienta en el sillón del barbero.")
+            self.cond_barbero.notify()
+
+            while not self.corte_terminado:
+                self.cond_corte.wait()
+
+            self.silla_barbero_ocupada = False
+            self.cliente_listo_en_sillon = False
+            self.corte_terminado = False
+            print(f"Cliente {cliente_id} se levanta con su corte nuevo.")
+            self.cond_barbero.notify()
+            self.cond_sala_espera.notify()
+            return True
 
     def atender_siguiente_cliente(self):
         """
@@ -89,8 +108,14 @@ class BarberiaMonitor:
             # 2. Si la barbería cerró y no quedan clientes, retornar False.
             # 3. Si hay un cliente listo en el sillón, retornar True.
             # =====================================================================
-            pass
-            return False
+            while not self.cliente_listo_en_sillon and self.barberia_abierta:
+                if self.clientes_esperando > 0:
+                    self.cond_sala_espera.notify()
+                self.cond_barbero.wait()
+
+            if not self.cliente_listo_en_sillon:
+                return False
+            return True
 
     # Alias pedagógico
     esperar_cliente_para_corte = atender_siguiente_cliente
@@ -106,7 +131,10 @@ class BarberiaMonitor:
             # 2. Avisar al cliente en el sillón (self.cond_corte.notify()).
             # 3. Esperar a que el cliente se levante del sillón (self.cond_barbero.wait()).
             # =====================================================================
-            pass
+            self.corte_terminado = True
+            self.cond_corte.notify()
+            while self.corte_terminado:
+                self.cond_barbero.wait()
 
     def cerrar_barberia(self):
         with self.lock:
